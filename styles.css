@@ -1,0 +1,397 @@
+/* styles.css */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    line-height: 1.6;
+    margin: 0;
+    padding: 0;
+    color: #333;
+    background-color: #f5f5f5;
+}
+
+header {
+    background-color: #2c3e50;
+    color: white;
+    text-align: center;
+    padding: 1rem;
+}
+
+.container {
+    display: grid;
+    grid-template-columns: minmax(250px, 300px) minmax(400px, 1fr) minmax(280px, 320px);
+    gap: 20px;
+    padding: 20px;
+    max-width: 100%;
+    margin: 0 auto;
+    overflow-x: hidden;
+}
+
+h2 {
+    color: #2c3e50;
+    border-bottom: 2px solid #3498db;
+    padding-bottom: 10px;
+}
+
+h3 {
+    color: #2980b9;
+}
+
+.setup-panel, .simulation-panel, .stats-panel {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    padding: 20px;
+    overflow: auto;
+    height: fit-content;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.stats-panel {
+    max-width: 100%;
+    overflow-x: auto;
+}
+
+.stats-panel table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+}
+
+.stats-panel td, .stats-panel th {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    padding: 8px;
+    border: 1px solid #ddd;
+}
+
+.sequence {
+    word-wrap: break-word;
+    overflow-wrap: break-word;
+    max-width: 100%;
+}
+
+/* Ensure all tables are responsive */
+table {
+    max-width: 100%;
+    overflow-x: auto;
+    display: block;
+}
+
+@media (min-width: 1200px) {
+    table {
+        display: table;
+    }
+}
+
+input, select, button {
+    margin: 5px 0;
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    cursor: pointer;
+    transition: background 0.3s;
+    padding: 8px 12px;
+    margin: 5px 0;
+    display: block;
+    clear: both;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.resource-item, .process-item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 5px;
+}
+
+.resource-item input {
+    flex: 1;
+    min-width: 100px;
+}
+
+.resource-item button {
+    margin-top: 5px;
+    width: 100%;
+}
+
+.visualization {
+    min-height: 300px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 15px;
+    margin-bottom: 20px;
+}
+
+#allocation-matrix {
+    overflow-x: auto;
+}
+
+#allocation-matrix table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+#allocation-matrix td, #allocation-matrix th {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: center;
+}
+
+#allocation-matrix th {
+    background-color: #f2f2f2;
+}
+
+.safe {
+    background-color: #d4edda;
+    color: #155724;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+.unsafe {
+    background-color: #f8d7da;
+    color: #721c24;
+    padding: 10px;
+    border-radius: 4px;
+}
+
+#system-log {
+    height: 200px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    border: 1px solid #ddd;
+    padding: 10px;
+    background-color: #f9f9f9;
+    font-family: monospace;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+footer {
+    text-align: center;
+    margin-top: 20px;
+    padding: 20px;
+    background-color: #2c3e50;
+    color: white;
+}
+
+#reset-simulation {
+    background-color: #e74c3c;
+}
+
+#reset-simulation:hover {
+    background-color: #c0392b;
+}
+
+/* Add styles for progress bars */
+.progress-bar {
+    width: 100%;
+    background-color: #e0e0e0;
+    border-radius: 4px;
+    position: relative;
+    height: 20px;
+}
+
+.progress {
+    height: 100%;
+    background-color: #3498db;
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.progress-bar span {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    text-align: center;
+    line-height: 20px;
+    color: #333;
+    font-size: 12px;
+}
+
+/* Chart styles */
+.chart {
+    margin-top: 20px;
+}
+
+.chart-bar {
+    display: flex;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.bar-label {
+    width: 80px;
+    text-align: right;
+    padding-right: 10px;
+}
+
+.bar-container {
+    flex-grow: 1;
+    background-color: #e0e0e0;
+    height: 20px;
+    border-radius: 4px;
+    margin-right: 10px;
+}
+
+.bar-fill {
+    height: 100%;
+    background-color: #3498db;
+    border-radius: 4px;
+}
+
+.bar-value {
+    width: 50px;
+}
+
+/* Improved responsive design */
+@media (max-width: 1400px) {
+    .container {
+        grid-template-columns: minmax(250px, 300px) minmax(350px, 1fr) minmax(250px, 300px);
+    }
+}
+
+@media (max-width: 1200px) {
+    .container {
+        grid-template-columns: 1fr;
+        gap: 30px;
+        padding: 10px;
+    }
+    
+    .resource-item, .process-item {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .resource-item input, .resource-item button,
+    .process-item input, .process-item button {
+        width: 100%;
+    }
+    
+    .setup-panel, .simulation-panel, .stats-panel {
+        margin-bottom: 20px;
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+}
+
+#process-creator {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+#max-needs-inputs {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.max-need-input {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 5px;
+}
+
+.max-need-input label {
+    min-width: 120px;
+}
+
+.max-need-input input {
+    flex: 1;
+}
+
+/* Improved form elements */
+input, select {
+    padding: 8px;
+    border-radius: 4px;
+    border: 1px solid #ddd;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+/* Highlight buttons for better visibility */
+#add-resource, #add-process, #request-btn, #release-btn {
+    background-color: #2ecc71;
+    font-weight: bold;
+    padding: 10px 15px;
+    margin: 10px 0;
+    width: 100%;
+}
+
+#add-resource:hover, #add-process:hover, #request-btn:hover, #release-btn:hover {
+    background-color: #27ae60;
+}
+
+/* Ensure resource controls are visible */
+#resources-list {
+    margin-bottom: 15px;
+}
+
+/* Add spacing between sections */
+.resource-setup, .process-setup {
+    margin-bottom: 25px;
+    padding-bottom: 15px;
+    border-bottom: 1px solid #eee;
+}
+
+.allocation-controls h3 {
+    margin-top: 20px;
+}
+
+/* Resource request and release styling */
+.resource-request, .resource-release {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 8px;
+}
+
+.resource-request label, .resource-release label {
+    min-width: 80px;
+    font-weight: bold;
+}
+
+.resource-request input, .resource-release input {
+    flex: 1;
+    min-width: 80px;
+}
+
+.resource-request span, .resource-release span {
+    display: block;
+    width: 100%;
+    font-size: 0.9em;
+    color: #666;
+    margin-top: 2px;
+}
+
+.allocation-controls {
+    width: 100%;
+}
+
+/* Safe sequence styling */
+.safe-sequence {
+    margin-top: 15px;
+}
+
+.sequence {
+    background-color: #e8f4fd;
+    padding: 10px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+    font-size: 1.1em;
+}

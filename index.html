@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resource Allocation Simulator</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>Resource Allocation Simulator</h1>
+        <p>Demonstrating Banker's Algorithm for Deadlock Avoidance</p>
+    </header>
+    
+    <div class="container">
+        <div class="setup-panel">
+            <h2>Resources and Processes</h2>
+            
+            <div class="resource-setup">
+                <h3>Define Resources</h3>
+                <div id="resources-list">
+                    <div class="resource-item">
+                        <input type="text" placeholder="Resource Name" id="resource-name">
+                        <input type="number" placeholder="Units" id="resource-units" min="1">
+                        <button id="add-resource">Add Resource</button>
+                    </div>
+                </div>
+                <div id="defined-resources"></div>
+            </div>
+            
+            <div class="process-setup">
+                <h3>Create Process</h3>
+                <div id="process-creator">
+                    <input type="text" placeholder="Process ID" id="process-id">
+                    <div id="max-needs-inputs"></div>
+                    <button id="add-process">Add Process</button>
+                </div>
+                <div id="process-list"></div>
+            </div>
+        </div>
+        
+        <div class="simulation-panel">
+            <h2>Resource Allocation Simulation</h2>
+            
+            <div class="visualization">
+                <div id="allocation-matrix"></div>
+                <div id="safety-status"></div>
+                <div id="safe-sequence"></div>
+            </div>
+            
+            <div class="allocation-controls">
+                <h3>Resource Request</h3>
+                <select id="request-process"></select>
+                <div id="request-resources"></div>
+                <button id="request-btn">Request Resources</button>
+                
+                <h3>Resource Release</h3>
+                <select id="release-process"></select>
+                <div id="release-resources"></div>
+                <button id="release-btn">Release Resources</button>
+            </div>
+        </div>
+        
+        <div class="stats-panel">
+            <h2>System Statistics</h2>
+            <div id="resource-stats"></div>
+            <div id="utilization-chart"></div>
+            <div id="system-log"></div>
+        </div>
+    </div>
+    
+    <footer>
+        <button id="reset-simulation">Reset Simulation</button>
+        <div>
+            <p>Developed as OS & Software Engineering Project</p>
+        </div>
+    </footer>
+    
+    <script src="simulation.js"></script>
+</body>
+</html>
