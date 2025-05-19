@@ -1,516 +1,688 @@
-// Global variables to store our simulation data
-let resourceList = [];        // List of all resources
-let processList = [];        // List of all processes
-let allocationMatrix = [];   // How many resources each process is using
-let maxNeedsMatrix = [];     // Maximum resources each process might need
-let systemLog = null;        // For showing messages to user
-
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    systemLog = document.getElementById('system-log');
-    setupEventListeners();
-    showMessage('System ready! Add some resources to get started.');
-});
-
-// Setup all our button click handlers
-function setupEventListeners() {
-    document.getElementById('add-resource').addEventListener('click', addNewResource);
-    document.getElementById('add-process').addEventListener('click', addNewProcess);
-    document.getElementById('request-btn').addEventListener('click', handleResourceRequest);
-    document.getElementById('release-btn').addEventListener('click', handleResourceRelease);
-    document.getElementById('reset-simulation').addEventListener('click', resetEverything);
+// simulation.js
+class Resource {
+    constructor(name, units) {
+        this.name = name;
+        this.totalUnits = units;
+        this.available = units;
+    }
 }
 
-// Add a new resource to the system
-function addNewResource() {
-    // Get values from input fields
-    const name = document.getElementById('resource-name').value.trim();
-    const totalUnits = parseInt(document.getElementById('resource-units').value);
-    
-    // Check if inputs are valid
-    if (!name || isNaN(totalUnits) || totalUnits <= 0) {
-        showMessage('Please enter a valid resource name and number of units!');
-        return;
+class Process {
+    constructor(pid, maxNeeds) {
+        this.pid = pid;
+        this.maxNeeds = maxNeeds; // Array matching resource types
+        this.allocation = Array(maxNeeds.length).fill(0);
+        this.remainingNeeds = [...maxNeeds]; // Clone max needs
     }
     
-    // Create new resource object
-    const newResource = {
-        name: name,
-        total: totalUnits,
-        available: totalUnits
-    };
-    
-    // Add to our list
-    resourceList.push(newResource);
-    
-    // Clear input fields
-    document.getElementById('resource-name').value = '';
-    document.getElementById('resource-units').value = '';
-    
-    // Update display
-    showMessage(`Added resource "${name}" with ${totalUnits} units`);
-    updateResourceDisplay();
-    updateProcessInputs();
+    // Calculate if process can finish with available resources
+    canFinish(available) {
+        return this.remainingNeeds.every((need, i) => need <= available[i]);
+    }
 }
 
-// Add a new process to the system
-function addNewProcess() {
-    if (resourceList.length === 0) {
-        showMessage('Please add some resources first!');
-        return;
+class BankersAlgorithm {
+    constructor(processes, resources, allocation, max) {
+        this.processes = processes;
+        this.resources = resources;
+        this.allocation = allocation;
+        this.max = max;
+        this.available = this.calculateAvailable();
     }
     
-    const processId = document.getElementById('process-id').value.trim();
-    
-    // Check if process ID is valid
-    if (!processId) {
-        showMessage('Please enter a process ID!');
-        return;
-    }
-    
-    // Check if process ID already exists
-    if (processList.includes(processId)) {
-        showMessage('This process ID already exists!');
-        return;
-    }
-    
-    // Get maximum resource needs
-    const maxNeeds = [];
-    for (let i = 0; i < resourceList.length; i++) {
-        const maxNeed = parseInt(document.getElementById(`max-${i}`).value) || 0;
-        
-        // Check if max need is valid
-        if (maxNeed > resourceList[i].total) {
-            showMessage(`Maximum need cannot be more than total ${resourceList[i].name} units!`);
-            return;
-        }
-        
-        maxNeeds.push(maxNeed);
-    }
-    
-    // Add process to our lists
-    processList.push(processId);
-    maxNeedsMatrix.push(maxNeeds);
-    allocationMatrix.push(new Array(resourceList.length).fill(0));
-    
-    // Clear input
-    document.getElementById('process-id').value = '';
-    
-    // Update display
-    showMessage(`Added process ${processId} with maximum needs: ${maxNeeds.join(', ')}`);
-    updateProcessDisplay();
-    updateAllocationTable();
-    checkIfSystemIsSafe();
-}
-
-// Check if a process can finish with given resources
-function canProcessFinish(processIndex, availableResources) {
-    for (let i = 0; i < resourceList.length; i++) {
-        // Calculate how many more resources the process needs
-        const currentlyHas = allocationMatrix[processIndex][i];
-        const maximumNeeds = maxNeedsMatrix[processIndex][i];
-        const stillNeeds = maximumNeeds - currentlyHas;
-        
-        // If we need more than what's available, process can't finish
-        if (stillNeeds > availableResources[i]) {
-            return false;
-        }
-    }
-    return true;
-}
-
-// Check if system is in a safe state
-function checkIfSystemIsSafe() {
-    // If no processes, system is safe
-    if (processList.length === 0) {
-        updateSafetyDisplay(true, []);
-        return true;
-    }
-    
-    // Copy available resources (we'll simulate with this)
-    const availableResources = resourceList.map(r => r.available);
-    
-    // Keep track of which processes have finished
-    const finished = new Array(processList.length).fill(false);
-    const safeSequence = [];
-    
-    // Keep trying to find processes that can finish
-    let foundOne;
-    do {
-        foundOne = false;
-        // Try each process
-        for (let i = 0; i < processList.length; i++) {
-            // Skip if this process already finished
-            if (finished[i]) continue;
-            
-            // Check if this process can finish
-            if (canProcessFinish(i, availableResources)) {
-                // Process can finish! Add its resources back to available
-                for (let j = 0; j < resourceList.length; j++) {
-                    availableResources[j] += allocationMatrix[i][j];
-                }
-                finished[i] = true;
-                safeSequence.push(processList[i]);
-                foundOne = true;
+    calculateAvailable() {
+        // Calculate available resources based on total and allocated
+        const available = [...this.resources];
+        for (let i = 0; i < this.processes.length; i++) {
+            for (let j = 0; j < this.resources.length; j++) {
+                available[j] -= this.allocation[i][j];
             }
         }
-    } while (foundOne); // Keep going until we can't find any more processes that can finish
-    
-    // System is safe if all processes could finish
-    const isSystemSafe = finished.every(f => f);
-    updateSafetyDisplay(isSystemSafe, safeSequence);
-    return isSystemSafe;
-}
-
-// Handle when a process requests resources
-function handleResourceRequest() {
-    const processIndex = parseInt(document.getElementById('request-process').value);
-    
-    // Check if process selection is valid
-    if (isNaN(processIndex)) {
-        showMessage('Please select a process first!');
-        return;
+        return available;
     }
     
-    // Get requested resources
-    const request = [];
-    for (let i = 0; i < resourceList.length; i++) {
-        const amount = parseInt(document.getElementById(`request-${i}`).value) || 0;
+    isSafeState() {
+        // Initialize working resources to available
+        const work = [...this.available];
+        // Track which processes can finish
+        const finish = Array(this.processes.length).fill(false);
+        // Store safe sequence if found
+        const safeSequence = [];
         
+        // Continue until no more processes can be added to safe sequence
+        let progress = true;
+        while (progress) {
+            progress = false;
+            
+            // Try to find a process that can finish with current resources
+            for (let i = 0; i < this.processes.length; i++) {
+                if (!finish[i]) {
+                    // Calculate if process i can finish with current work
+                    const need = this.max[i].map((m, j) => m - this.allocation[i][j]);
+                    const canFinish = need.every((n, j) => n <= work[j]);
+                    
+                    if (canFinish) {
+                        // Process can finish, add its resources back to work
+                        for (let j = 0; j < this.resources.length; j++) {
+                            work[j] += this.allocation[i][j];
+                        }
+                        finish[i] = true;
+                        safeSequence.push(i);
+                        progress = true;
+                    }
+                }
+            }
+        }
+        
+        // Check if all processes can finish
+        const isAllSafe = finish.every(f => f);
+        return {
+            safe: isAllSafe,
+            sequence: isAllSafe ? safeSequence : []
+        };
+    }
+    
+    requestResources(processIndex, request) {
         // Check if request is valid
-        if (amount > resourceList[i].available) {
-            showMessage(`Not enough ${resourceList[i].name} available!`);
-            return;
+        const need = this.max[processIndex].map((m, i) => m - this.allocation[processIndex][i]);
+        
+        // Ensure request doesn't exceed max needs
+        for (let i = 0; i < request.length; i++) {
+            if (request[i] > need[i]) {
+                return { 
+                    granted: false, 
+                    reason: "Request exceeds maximum need" 
+                };
+            }
         }
         
-        const wouldHaveTotal = allocationMatrix[processIndex][i] + amount;
-        if (wouldHaveTotal > maxNeedsMatrix[processIndex][i]) {
-            showMessage(`Request exceeds maximum need for ${resourceList[i].name}!`);
-            return;
+        // Check if resources are available
+        for (let i = 0; i < request.length; i++) {
+            if (request[i] > this.available[i]) {
+                return { 
+                    granted: false, 
+                    reason: "Resources not available" 
+                };
+            }
         }
         
-        request.push(amount);
-    }
-    
-    // Try allocating resources temporarily
-    const oldAllocation = allocationMatrix.map(row => [...row]);
-    const oldAvailable = resourceList.map(r => r.available);
-    
-    // Allocate resources temporarily
-    for (let i = 0; i < resourceList.length; i++) {
-        allocationMatrix[processIndex][i] += request[i];
-        resourceList[i].available -= request[i];
-    }
-    
-    // Check if this makes system unsafe
-    const safetyCheck = checkIfSystemIsSafe();
-    if (safetyCheck) {
-        showMessage(`Resources granted to process ${processList[processIndex]}`);
-        updateResourceDisplay();
-        updateProcessDisplay();
-        updateAllocationTable();
-        updateResourceStats();
-    } else {
-        // Undo allocation
-        allocationMatrix = oldAllocation;
-        resourceList.forEach((r, i) => r.available = oldAvailable[i]);
-        showMessage('Request denied - would make system unsafe!');
+        // Try allocation
+        const tempAllocation = this.allocation.map(row => [...row]);
+        const tempAvailable = [...this.available];
         
-        // Re-check safety with original allocation to restore safe sequence
-        checkIfSystemIsSafe();
-        updateResourceDisplay();
-        updateProcessDisplay();
-        updateAllocationTable();
-        updateResourceStats();
-    }
-}
-
-// Handle when a process releases resources
-function handleResourceRelease() {
-    const processIndex = parseInt(document.getElementById('release-process').value);
-    
-    // Check if process selection is valid
-    if (isNaN(processIndex)) {
-        showMessage('Please select a process first!');
-        return;
-    }
-    
-    // Get resources to release
-    for (let i = 0; i < resourceList.length; i++) {
-        const amount = parseInt(document.getElementById(`release-${i}`).value) || 0;
-        
-        // Check if release amount is valid
-        if (amount > allocationMatrix[processIndex][i]) {
-            showMessage(`Cannot release more than allocated for ${resourceList[i].name}!`);
-            return;
+        // Allocate resources temporarily
+        for (let i = 0; i < request.length; i++) {
+            tempAllocation[processIndex][i] += request[i];
+            tempAvailable[i] -= request[i];
         }
         
-        // Release resources
-        allocationMatrix[processIndex][i] -= amount;
-        resourceList[i].available += amount;
-    }
-    
-    showMessage(`Resources released from process ${processList[processIndex]}`);
-    updateResourceDisplay();
-    updateProcessDisplay();
-    updateAllocationTable();
-    checkIfSystemIsSafe();
-    updateResourceStats();
-}
-
-// Reset everything to starting state
-function resetEverything() {
-    resourceList = [];
-    processList = [];
-    allocationMatrix = [];
-    maxNeedsMatrix = [];
-    
-    showMessage('System reset to initial state');
-    updateResourceDisplay();
-    updateProcessDisplay();
-    updateAllocationTable();
-    updateResourceStats();
-    
-    // Clear safety display
-    document.getElementById('safety-status').innerHTML = '';
-    document.getElementById('safe-sequence').innerHTML = '';
-}
-
-// Update the resource display table
-function updateResourceDisplay() {
-    const container = document.getElementById('defined-resources');
-    
-    if (resourceList.length === 0) {
-        container.innerHTML = '<p>No resources defined yet</p>';
-        return;
-    }
-    
-    let html = '<table><tr><th>Resource</th><th>Total Units</th><th>Available</th></tr>';
-    
-    resourceList.forEach(resource => {
-        html += `
-            <tr>
-                <td>${resource.name}</td>
-                <td>${resource.total}</td>
-                <td>${resource.available}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</table>';
-    container.innerHTML = html;
-}
-
-// Update the process input fields
-function updateProcessInputs() {
-    const container = document.getElementById('max-needs-inputs');
-    
-    if (resourceList.length === 0) {
-        container.innerHTML = '<p>Define resources first</p>';
-        return;
-    }
-    
-    let html = '';
-    resourceList.forEach((resource, i) => {
-        html += `
-            <div class="max-need-input">
-                <label>${resource.name} Max Need:</label>
-                <input type="number" id="max-${i}" min="0" max="${resource.total}" value="0">
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Update the process display table
-function updateProcessDisplay() {
-    const container = document.getElementById('process-list');
-    
-    if (processList.length === 0) {
-        container.innerHTML = '<p>No processes created yet</p>';
-        return;
-    }
-    
-    let html = '<table><tr><th>Process ID</th><th>Max Needs</th><th>Current Allocation</th></tr>';
-    
-    processList.forEach((pid, i) => {
-        html += `
-            <tr>
-                <td>${pid}</td>
-                <td>${maxNeedsMatrix[i].join(', ')}</td>
-                <td>${allocationMatrix[i].join(', ')}</td>
-            </tr>
-        `;
-    });
-    
-    html += '</table>';
-    container.innerHTML = html;
-    
-    // Also update process dropdowns
-    updateProcessDropdowns();
-}
-
-// Update the allocation table
-function updateAllocationTable() {
-    const container = document.getElementById('allocation-matrix');
-    
-    if (processList.length === 0 || resourceList.length === 0) {
-        container.innerHTML = '<p>Add processes and resources to view allocation</p>';
-        return;
-    }
-    
-    let html = '<table><tr><th>Process</th>';
-    
-    // Add resource names as headers
-    resourceList.forEach(r => {
-        html += `<th>${r.name}</th>`;
-    });
-    html += '</tr>';
-    
-    // Add rows for each process
-    processList.forEach((pid, i) => {
-        // Current allocation row
-        html += `<tr><td>${pid} (Current)</td>`;
-        allocationMatrix[i].forEach(amount => {
-            html += `<td>${amount}</td>`;
-        });
-        html += '</tr>';
-        
-        // Maximum needs row
-        html += `<tr><td>${pid} (Max)</td>`;
-        maxNeedsMatrix[i].forEach(amount => {
-            html += `<td>${amount}</td>`;
-        });
-        html += '</tr>';
-        
-        // Still needs row
-        html += `<tr><td>${pid} (Needs)</td>`;
-        maxNeedsMatrix[i].forEach((max, j) => {
-            const needs = max - allocationMatrix[i][j];
-            html += `<td>${needs}</td>`;
-        });
-        html += '</tr>';
-    });
-    
-    html += '</table>';
-    container.innerHTML = html;
-}
-
-// Update process selection dropdowns
-function updateProcessDropdowns() {
-    const requestSelect = document.getElementById('request-process');
-    const releaseSelect = document.getElementById('release-process');
-    
-    let options = '<option value="">Select Process</option>';
-    
-    processList.forEach((pid, i) => {
-        options += `<option value="${i}">${pid}</option>`;
-    });
-    
-    requestSelect.innerHTML = options;
-    releaseSelect.innerHTML = options;
-    
-    // Update resource request/release inputs when process is selected
-    requestSelect.onchange = function() {
-        updateRequestInputs(parseInt(this.value));
-    };
-    
-    releaseSelect.onchange = function() {
-        updateReleaseInputs(parseInt(this.value));
-    };
-}
-
-// Update resource request input fields
-function updateRequestInputs(processIndex) {
-    const container = document.getElementById('request-resources');
-    
-    if (isNaN(processIndex)) {
-        container.innerHTML = '<p>Select a process first</p>';
-        return;
-    }
-    
-    let html = '';
-    resourceList.forEach((resource, i) => {
-        const maxRequest = Math.min(
-            resource.available,
-            maxNeedsMatrix[processIndex][i] - allocationMatrix[processIndex][i]
+        // Check safety with temporary allocation
+        const tempBanker = new BankersAlgorithm(
+            this.processes,
+            this.resources,
+            tempAllocation,
+            this.max
         );
         
-        html += `
-            <div class="resource-request">
-                <label>${resource.name}:</label>
-                <input type="number" id="request-${i}" min="0" max="${maxRequest}" value="0">
-                <span>(Available: ${resource.available})</span>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Update resource release input fields
-function updateReleaseInputs(processIndex) {
-    const container = document.getElementById('release-resources');
-    
-    if (isNaN(processIndex)) {
-        container.innerHTML = '<p>Select a process first</p>';
-        return;
-    }
-    
-    let html = '';
-    resourceList.forEach((resource, i) => {
-        const currentAllocation = allocationMatrix[processIndex][i];
+        const safety = tempBanker.isSafeState();
         
-        html += `
-            <div class="resource-release">
-                <label>${resource.name}:</label>
-                <input type="number" id="release-${i}" min="0" max="${currentAllocation}" value="0">
-                <span>(Currently has: ${currentAllocation})</span>
-            </div>
-        `;
-    });
-    
-    container.innerHTML = html;
-}
-
-// Update the safety status display
-function updateSafetyDisplay(isSafe, sequence) {
-    const statusDiv = document.getElementById('safety-status');
-    const sequenceDiv = document.getElementById('safe-sequence');
-    
-    if (isSafe) {
-        statusDiv.innerHTML = '<div class="safe">System is in a safe state</div>';
-        if (sequence.length > 0) {
-            sequenceDiv.innerHTML = `
-                <h3>Safe Sequence:</h3>
-                <div class="sequence">${sequence.join(' → ')}</div>
-            `;
+        if (safety.safe) {
+            // Update actual allocation if safe
+            this.allocation = tempAllocation;
+            this.available = tempAvailable;
+            return {
+                granted: true,
+                safeSequence: safety.sequence
+            };
+        } else {
+            return {
+                granted: false,
+                reason: "Request would lead to unsafe state",
+                safetyCheck: safety
+            };
         }
-    } else {
-        statusDiv.innerHTML = '<div class="unsafe">System is in an unsafe state</div>';
-        sequenceDiv.innerHTML = '';
     }
     
-    // Force update the allocation table to reflect current state
-    updateAllocationTable();
+    releaseResources(processIndex, release) {
+        // Validate release request
+        for (let i = 0; i < release.length; i++) {
+            if (release[i] > this.allocation[processIndex][i]) {
+                return {
+                    success: false,
+                    reason: "Cannot release more resources than allocated"
+                };
+            }
+        }
+        
+        // Update allocation and available
+        for (let i = 0; i < release.length; i++) {
+            // Ensure we don't go below zero
+            const releaseAmount = Math.min(release[i], this.allocation[processIndex][i]);
+            this.allocation[processIndex][i] -= releaseAmount;
+            this.available[i] += releaseAmount;
+        }
+        
+        return {
+            success: true,
+            newAvailable: [...this.available]
+        };
+    }
 }
 
-// Update resource statistics and charts
-function updateResourceStats() {
-    const statsDiv = document.getElementById('resource-stats');
-    const chartDiv = document.getElementById('utilization-chart');
-    
-    if (resourceList.length === 0) {
-        statsDiv.innerHTML = '<h3>Resource Utilization</h3><p>No resources defined yet</p>';
-        chartDiv.innerHTML = '<h3>Resource Utilization Chart</h3><p>No resources to display</p>';
-        return;
+class ResourceSimulator {
+    constructor() {
+        this.resources = [];
+        this.processes = [];
+        this.allocation = [];
+        this.max = [];
+        this.systemLog = document.getElementById('system-log');
+        this.initializeUI();
     }
     
-    // Create stats table
-    let statsHtml = `
-        <h3>Resource Utilization</h3>
-        <table>
+    initializeUI() {
+        this.updateResourceInputs();
+        this.updateProcessDropdowns();
+        this.logMessage('System initialized. Ready to define resources and processes.');
+    }
+    
+    addResource() {
+        const nameInput = document.getElementById('resource-name');
+        const unitsInput = document.getElementById('resource-units');
+        
+        const name = nameInput.value.trim();
+        const units = parseInt(unitsInput.value);
+        
+        if (!name || isNaN(units) || units <= 0) {
+            this.logMessage('ERROR: Invalid resource definition');
+            return;
+        }
+        
+        this.resources.push(new Resource(name, units));
+        this.updateDefinedResources();
+        this.updateMaxNeedsInputs();
+        this.updateRequestInputs();
+        this.updateReleaseInputs();
+        this.logMessage(`Resource "${name}" with ${units} units added`);
+        
+        // Clear inputs
+        nameInput.value = '';
+        unitsInput.value = '';
+    }
+    
+    updateDefinedResources() {
+        const container = document.getElementById('defined-resources');
+        container.innerHTML = '';
+        
+        if (this.resources.length === 0) {
+            container.innerHTML = '<p>No resources defined yet</p>';
+            return;
+        }
+        
+        const table = document.createElement('table');
+        table.innerHTML = `
+            <tr>
+                <th>Resource</th>
+                <th>Total Units</th>
+                <th>Available</th>
+            </tr>
+        `;
+        
+        this.resources.forEach(resource => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${resource.name}</td>
+                <td>${resource.totalUnits}</td>
+                <td>${resource.available}</td>
+            `;
+            table.appendChild(row);
+        });
+        
+        container.appendChild(table);
+    }
+    
+    updateMaxNeedsInputs() {
+        const container = document.getElementById('max-needs-inputs');
+        container.innerHTML = '';
+        
+        if (this.resources.length === 0) {
+            container.innerHTML = '<p>Define resources first</p>';
+            return;
+        }
+        
+        this.resources.forEach((resource, index) => {
+            const input = document.createElement('div');
+            input.className = 'max-need-input';
+            input.innerHTML = `
+                <label>${resource.name} Max Need:</label>
+                <input type="number" id="max-${index}" min="0" max="${resource.totalUnits}" value="0">
+            `;
+            container.appendChild(input);
+        });
+    }
+    
+    addProcess() {
+        if (this.resources.length === 0) {
+            this.logMessage('ERROR: Define resources before adding processes');
+            return;
+        }
+        
+        const pidInput = document.getElementById('process-id');
+        const pid = pidInput.value.trim();
+        
+        if (!pid) {
+            this.logMessage('ERROR: Process ID required');
+            return;
+        }
+        
+        // Check for duplicate PID
+        if (this.processes.some(p => p.pid === pid)) {
+            this.logMessage('ERROR: Process ID already exists');
+            return;
+        }
+        
+        // Get max needs
+        const maxNeeds = [];
+        for (let i = 0; i < this.resources.length; i++) {
+            const maxInput = document.getElementById(`max-${i}`);
+            const maxValue = parseInt(maxInput.value);
+            
+            if (isNaN(maxValue) || maxValue < 0) {
+                this.logMessage('ERROR: Invalid max need value');
+                return;
+            }
+            
+            if (maxValue > this.resources[i].totalUnits) {
+                this.logMessage(`ERROR: Max need exceeds total units for ${this.resources[i].name}`);
+                return;
+            }
+            
+            maxNeeds.push(maxValue);
+        }
+        
+        // Create process
+        const process = new Process(pid, maxNeeds);
+        this.processes.push(process);
+        
+        // Update allocation matrix
+        this.allocation.push(Array(this.resources.length).fill(0));
+        this.max.push([...maxNeeds]);
+        
+        this.updateProcessList();
+        this.updateAllocationMatrix();
+        this.updateProcessDropdowns();
+        this.checkSystemSafety();
+        
+        this.logMessage(`Process "${pid}" added with max needs: ${maxNeeds.join(', ')}`);
+        
+        // Clear inputs
+        pidInput.value = '';
+        this.updateMaxNeedsInputs();
+    }
+    
+    updateProcessList() {
+        const container = document.getElementById('process-list');
+        container.innerHTML = '';
+        
+        if (this.processes.length === 0) {
+            container.innerHTML = '<p>No processes created yet</p>';
+            return;
+        }
+        
+        const table = document.createElement('table');
+        table.innerHTML = `
+            <tr>
+                <th>Process ID</th>
+                <th>Max Needs</th>
+                <th>Current Allocation</th>
+            </tr>
+        `;
+        
+        this.processes.forEach((process, index) => {
+            const row = document.createElement('tr');
+            row.innerHTML = `
+                <td>${process.pid}</td>
+                <td>${process.maxNeeds.join(', ')}</td>
+                <td>${this.allocation[index].join(', ')}</td>
+            `;
+            table.appendChild(row);
+        });
+        
+        container.appendChild(table);
+    }
+    
+    updateAllocationMatrix() {
+        const container = document.getElementById('allocation-matrix');
+        container.innerHTML = '';
+        
+        if (this.processes.length === 0 || this.resources.length === 0) {
+            container.innerHTML = '<p>Add processes and resources to view allocation</p>';
+            return;
+        }
+        
+        // Create allocation table
+        const table = document.createElement('table');
+        
+        // Create header row with resource names
+        const headerRow = document.createElement('tr');
+        headerRow.innerHTML = '<th>Process</th>';
+        this.resources.forEach(resource => {
+            headerRow.innerHTML += `<th>${resource.name}</th>`;
+        });
+        table.appendChild(headerRow);
+        
+        // Create rows for each process
+        this.processes.forEach((process, pIndex) => {
+            // Allocation row
+            const allocRow = document.createElement('tr');
+            allocRow.innerHTML = `<td>${process.pid} (Allocated)</td>`;
+            
+            this.allocation[pIndex].forEach((allocated, rIndex) => {
+                allocRow.innerHTML += `<td>${allocated}</td>`;
+            });
+            
+            // Max needs row
+            const maxRow = document.createElement('tr');
+            maxRow.innerHTML = `<td>${process.pid} (Max)</td>`;
+            
+            this.max[pIndex].forEach((max, rIndex) => {
+                maxRow.innerHTML += `<td>${max}</td>`;
+            });
+            
+            // Need row
+            const needRow = document.createElement('tr');
+            needRow.innerHTML = `<td>${process.pid} (Need)</td>`;
+            
+            this.max[pIndex].forEach((max, rIndex) => {
+                const need = max - this.allocation[pIndex][rIndex];
+                needRow.innerHTML += `<td>${need}</td>`;
+            });
+            
+            table.appendChild(allocRow);
+            table.appendChild(maxRow);
+            table.appendChild(needRow);
+        });
+        
+        container.appendChild(table);
+    }
+    
+    updateProcessDropdowns() {
+        const requestProcessSelect = document.getElementById('request-process');
+        const releaseProcessSelect = document.getElementById('release-process');
+        
+        if (!requestProcessSelect || !releaseProcessSelect) return;
+        
+        // Clear current options
+        requestProcessSelect.innerHTML = '';
+        releaseProcessSelect.innerHTML = '';
+        
+        // Add empty option
+        requestProcessSelect.innerHTML = '<option value="">Select Process</option>';
+        releaseProcessSelect.innerHTML = '<option value="">Select Process</option>';
+        
+        // Add process options
+        this.processes.forEach((process, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            option.textContent = process.pid;
+            
+            requestProcessSelect.appendChild(option.cloneNode(true));
+            releaseProcessSelect.appendChild(option);
+        });
+        
+        // Update inputs when process is selected
+        requestProcessSelect.addEventListener('change', () => {
+            const selectedIndex = requestProcessSelect.value;
+            if (selectedIndex === '') return;
+            this.updateRequestInputs(parseInt(selectedIndex));
+        });
+        
+        releaseProcessSelect.addEventListener('change', () => {
+            const selectedIndex = releaseProcessSelect.value;
+            if (selectedIndex === '') return;
+            this.updateReleaseInputs(parseInt(selectedIndex));
+        });
+    }
+    
+    updateRequestInputs(processIndex) {
+        const container = document.getElementById('request-resources');
+        container.innerHTML = '';
+        
+        if (this.resources.length === 0 || this.processes.length === 0) {
+            container.innerHTML = '<p>No resources or processes available</p>';
+            return;
+        }
+        
+        if (processIndex !== undefined && (processIndex < 0 || processIndex >= this.processes.length)) {
+            container.innerHTML = '<p>Select a process</p>';
+            return;
+        }
+        
+        this.resources.forEach((resource, index) => {
+            const maxRequest = processIndex !== undefined ? 
+                this.max[processIndex][index] - this.allocation[processIndex][index] : 
+                resource.available;
+            
+            const div = document.createElement('div');
+            div.className = 'resource-request';
+            div.innerHTML = `
+                <label>${resource.name}:</label>
+                <input type="number" id="request-${index}" min="0" max="${Math.min(maxRequest, resource.available)}" value="0">
+                <span>Available: ${resource.available}</span>
+            `;
+            container.appendChild(div);
+        });
+    }
+    
+    updateReleaseInputs(processIndex) {
+        const container = document.getElementById('release-resources');
+        container.innerHTML = '';
+        
+        if (this.resources.length === 0 || this.processes.length === 0) {
+            container.innerHTML = '<p>No resources or processes available</p>';
+            return;
+        }
+        
+        if (processIndex !== undefined && (processIndex < 0 || processIndex >= this.processes.length)) {
+            container.innerHTML = '<p>Select a process</p>';
+            return;
+        }
+        
+        this.resources.forEach((resource, index) => {
+            const maxRelease = processIndex !== undefined ? 
+                this.allocation[processIndex][index] : 0;
+            
+            const div = document.createElement('div');
+            div.className = 'resource-release';
+            div.innerHTML = `
+                <label>${resource.name}:</label>
+                <input type="number" id="release-${index}" min="0" max="${maxRelease}" value="0">
+                <span>Allocated: ${maxRelease}</span>
+            `;
+            container.appendChild(div);
+        });
+    }
+    
+    requestResourcesForProcess() {
+        const processSelect = document.getElementById('request-process');
+        const processIndex = parseInt(processSelect.value);
+        
+        if (isNaN(processIndex) || processIndex < 0 || processIndex >= this.processes.length) {
+            this.logMessage('ERROR: Invalid process selection');
+            return;
+        }
+        
+        // Get request values
+        const request = [];
+        for (let i = 0; i < this.resources.length; i++) {
+            const requestInput = document.getElementById(`request-${i}`);
+            const value = parseInt(requestInput.value);
+            
+            if (isNaN(value) || value < 0) {
+                this.logMessage('ERROR: Invalid request value');
+                return;
+            }
+            
+            request.push(value);
+        }
+        
+        // Create current state for banker's algorithm
+        const resourcesAvailable = this.resources.map(r => r.available);
+        const bankerAlgo = new BankersAlgorithm(
+            this.processes.map(p => p.pid),
+            this.resources.map(r => r.totalUnits),
+            this.allocation,
+            this.max
+        );
+        
+        // Request resources
+        const result = bankerAlgo.requestResources(processIndex, request);
+        
+        if (result.granted) {
+            // Update process allocation and remaining needs
+            for (let i = 0; i < request.length; i++) {
+                if (request[i] > 0) {
+                    this.allocation[processIndex][i] += request[i];
+                    this.resources[i].available -= request[i];
+                    this.processes[processIndex].allocation[i] += request[i];
+                    this.processes[processIndex].remainingNeeds[i] -= request[i];
+                }
+            }
+            
+            const processName = this.processes[processIndex].pid;
+            this.logMessage(`Resources granted to process ${processName}`);
+            
+            // Update UI
+            this.updateDefinedResources();
+            this.updateProcessList();
+            this.updateAllocationMatrix();
+            this.updateRequestInputs(processIndex);
+            this.updateReleaseInputs(processIndex);
+            this.checkSystemSafety();
+        } else {
+            this.logMessage(`ERROR: Request denied - ${result.reason}`);
+        }
+    }
+    
+    releaseResourcesFromProcess() {
+        const processSelect = document.getElementById('release-process');
+        const processIndex = parseInt(processSelect.value);
+        
+        if (isNaN(processIndex) || processIndex < 0 || processIndex >= this.processes.length) {
+            this.logMessage('ERROR: Invalid process selection');
+            return;
+        }
+        
+        // Get release values
+        const release = [];
+        for (let i = 0; i < this.resources.length; i++) {
+            const releaseInput = document.getElementById(`release-${i}`);
+            const value = parseInt(releaseInput.value);
+            
+            if (isNaN(value) || value < 0) {
+                this.logMessage('ERROR: Invalid release value');
+                return;
+            }
+            
+            // Ensure we don't release more than what's allocated
+            const currentAllocation = this.allocation[processIndex][i];
+            if (value > currentAllocation) {
+                this.logMessage(`ERROR: Cannot release more than allocated for ${this.resources[i].name}`);
+                return;
+            }
+            
+            release.push(value);
+        }
+        
+        // Create a deep copy of the current state
+        const oldAllocation = JSON.parse(JSON.stringify(this.allocation));
+        const oldAvailable = this.resources.map(r => r.available);
+        
+        // Update allocation and available resources directly
+        for (let i = 0; i < release.length; i++) {
+            if (release[i] > 0) {
+                this.allocation[processIndex][i] -= release[i];
+                this.resources[i].available += release[i];
+                this.processes[processIndex].allocation[i] -= release[i];
+                this.processes[processIndex].remainingNeeds[i] += release[i];
+            }
+        }
+        
+        // Check if the system is still in a safe state
+        const bankerAlgo = new BankersAlgorithm(
+            this.processes.map(p => p.pid),
+            this.resources.map(r => r.totalUnits),
+            this.allocation,
+            this.max
+        );
+        
+        const safetyResult = bankerAlgo.isSafeState();
+        
+        if (safetyResult.safe) {
+            const processName = this.processes[processIndex].pid;
+            this.logMessage(`Resources released from process ${processName}`);
+            
+            // Update UI
+            this.updateDefinedResources();
+            this.updateProcessList();
+            this.updateAllocationMatrix();
+            this.updateRequestInputs(processIndex);
+            this.updateReleaseInputs(processIndex);
+            this.checkSystemSafety();
+        } else {
+            // Revert changes if the system would be unsafe
+            this.allocation = oldAllocation;
+            for (let i = 0; i < this.resources.length; i++) {
+                this.resources[i].available = oldAvailable[i];
+                this.processes[processIndex].allocation[i] = oldAllocation[processIndex][i];
+                this.processes[processIndex].remainingNeeds[i] = this.max[processIndex][i] - oldAllocation[processIndex][i];
+            }
+            
+            this.logMessage('ERROR: Release would lead to unsafe state');
+        }
+    }
+    
+    checkSystemSafety() {
+        if (this.processes.length === 0 || this.resources.length === 0) {
+            return;
+        }
+        
+        const bankerAlgo = new BankersAlgorithm(
+            this.processes.map(p => p.pid),
+            this.resources.map(r => r.totalUnits),
+            this.allocation,
+            this.max
+        );
+        
+        const safetyResult = bankerAlgo.isSafeState();
+        const safetyStatus = document.getElementById('safety-status');
+        const safeSequenceDiv = document.getElementById('safe-sequence');
+        
+        if (safetyResult.safe) {
+            safetyStatus.innerHTML = '<div class="safe">System is in a safe state</div>';
+            
+            // Display safe sequence
+            const sequenceProcesses = safetyResult.sequence.map(index => this.processes[index].pid);
+            safeSequenceDiv.innerHTML = '<h3>Safe Sequence:</h3>';
+            safeSequenceDiv.innerHTML += `<div class="sequence">${sequenceProcesses.join(' → ')}</div>`;
+        } else {
+            safetyStatus.innerHTML = '<div class="unsafe">System is in an unsafe state</div>';
+            safeSequenceDiv.innerHTML = '';
+        }
+        
+        this.updateResourceStats();
+    }
+    
+    updateResourceStats() {
+        const statsDiv = document.getElementById('resource-stats');
+        statsDiv.innerHTML = '<h3>Resource Utilization</h3>';
+        
+        if (this.resources.length === 0) {
+            statsDiv.innerHTML += '<p>No resources defined yet</p>';
+            return;
+        }
+        
+        const statsTable = document.createElement('table');
+        statsTable.innerHTML = `
             <tr>
                 <th>Resource</th>
                 <th>Total</th>
@@ -518,54 +690,122 @@ function updateResourceStats() {
                 <th>Available</th>
                 <th>Utilization</th>
             </tr>
-    `;
-    
-    // Create chart
-    let chartHtml = '<h3>Resource Utilization Chart</h3><div class="chart">';
-    
-    resourceList.forEach((resource, i) => {
-        // Calculate total allocation for this resource
-        let totalAllocated = 0;
-        for (let j = 0; j < processList.length; j++) {
-            totalAllocated += allocationMatrix[j][i];
-        }
+        `;
         
-        // Calculate utilization percentage
-        const utilization = (totalAllocated / resource.total * 100).toFixed(2);
-        
-        // Add to stats table
-        statsHtml += `
-            <tr>
+        this.resources.forEach((resource, index) => {
+            // Calculate total allocation for this resource across all processes
+            let totalAllocated = 0;
+            for (let i = 0; i < this.processes.length; i++) {
+                totalAllocated += this.allocation[i][index];
+            }
+            
+            const utilization = (totalAllocated / resource.totalUnits * 100).toFixed(2);
+            
+            const row = document.createElement('tr');
+            row.innerHTML = `
                 <td>${resource.name}</td>
-                <td>${resource.total}</td>
+                <td>${resource.totalUnits}</td>
                 <td>${totalAllocated}</td>
                 <td>${resource.available}</td>
                 <td>${utilization}%</td>
-            </tr>
-        `;
+            `;
+            statsTable.appendChild(row);
+        });
         
-        // Add to chart
-        chartHtml += `
-            <div class="chart-bar">
+        statsDiv.appendChild(statsTable);
+        
+        // Update utilization chart separately
+        this.updateUtilizationChart();
+    }
+    
+    updateUtilizationChart() {
+        const chartDiv = document.getElementById('utilization-chart');
+        chartDiv.innerHTML = '<h3>Resource Utilization Chart</h3>';
+        
+        if (this.resources.length === 0) {
+            chartDiv.innerHTML += '<p>No resources to display</p>';
+            return;
+        }
+        
+        const chartContainer = document.createElement('div');
+        chartContainer.className = 'chart';
+        
+        this.resources.forEach((resource, index) => {
+            // Calculate total allocation for this resource across all processes
+            let totalAllocated = 0;
+            for (let i = 0; i < this.processes.length; i++) {
+                totalAllocated += this.allocation[i][index];
+            }
+            
+            const percentage = (totalAllocated / resource.totalUnits * 100).toFixed(2);
+            
+            const barDiv = document.createElement('div');
+            barDiv.className = 'chart-bar';
+            barDiv.innerHTML = `
                 <div class="bar-label">${resource.name}</div>
                 <div class="bar-container">
-                    <div class="bar-fill" style="width: ${utilization}%"></div>
+                    <div class="bar-fill" style="width: ${percentage}%"></div>
                 </div>
-                <div class="bar-value">${utilization}%</div>
-            </div>
-        `;
-    });
+                <div class="bar-value">${percentage}%</div>
+            `;
+            
+            chartContainer.appendChild(barDiv);
+        });
+        
+        chartDiv.appendChild(chartContainer);
+    }
     
-    statsHtml += '</table>';
-    chartHtml += '</div>';
+    logMessage(message, type = 'info') {
+        const timestamp = new Date().toLocaleTimeString();
+        const logEntry = document.createElement('div');
+        logEntry.className = `log-entry ${type}`;
+        logEntry.innerHTML = `<span class="time">[${timestamp}]</span> ${message}`;
+        
+        this.systemLog.appendChild(logEntry);
+        this.systemLog.scrollTop = this.systemLog.scrollHeight;
+    }
     
-    statsDiv.innerHTML = statsHtml;
-    chartDiv.innerHTML = chartHtml;
+    updateResourceInputs() {
+        // Event listener for add resource button
+        const addResourceBtn = document.getElementById('add-resource');
+        if (addResourceBtn) {
+            addResourceBtn.addEventListener('click', () => this.addResource());
+        }
+    }
+    
+    resetSimulation() {
+        // Reset all data structures
+        this.resources = [];
+        this.processes = [];
+        this.allocation = [];
+        this.max = [];
+        
+        // Clear UI
+        this.updateDefinedResources();
+        this.updateMaxNeedsInputs();
+        this.updateProcessList();
+        this.updateAllocationMatrix();
+        this.updateProcessDropdowns();
+        this.updateRequestInputs();
+        this.updateReleaseInputs();
+        
+        // Clear visualization
+        document.getElementById('safety-status').innerHTML = '';
+        document.getElementById('safe-sequence').innerHTML = '';
+        document.getElementById('resource-stats').innerHTML = '<h3>Resource Utilization</h3><p>No data to display</p>';
+        document.getElementById('utilization-chart').innerHTML = '<h3>Resource Utilization Chart</h3><p>No data to display</p>';
+        
+        this.logMessage('Simulation reset');
+    }
 }
 
-// Helper function to show messages in the system log
-function showMessage(message) {
-    const time = new Date().toLocaleTimeString();
-    systemLog.innerHTML += `<div class="log-entry">[${time}] ${message}</div>`;
-    systemLog.scrollTop = systemLog.scrollHeight;
-}
+// Initialize the simulator when the DOM is loaded
+document.addEventListener('DOMContentLoaded', function() {
+    const simulator = new ResourceSimulator();
+    
+    // Connect event listeners to buttons
+    document.getElementById('add-process').addEventListener('click', () => simulator.addProcess());
+    document.getElementById('request-btn').addEventListener('click', () => simulator.requestResourcesForProcess());
+    document.getElementById('release-btn').addEventListener('click', () => simulator.releaseResourcesFromProcess());
+    document.getElementById('reset-simulation').addEventListener('click', () => simulator.resetSimulation());
+});
